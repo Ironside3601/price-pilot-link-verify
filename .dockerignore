@@ -1,0 +1,44 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+.pytest_cache
+.coverage
+htmlcov/
+.tox
+.nox
+.eggs
+*.egg-info/
+*.egg
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Tests (not needed in production image)
+tests/
+
+# Documentation
+*.md
+*.txt
+!requirements.txt
+
+# Local files
+*.log
+*.json
+!package.json
+QUICK-START.txt
