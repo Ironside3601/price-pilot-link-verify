@@ -13,9 +13,41 @@ from pydantic import BaseModel
 import os
 from typing import Optional, List, Dict, Any
 from datetime import datetime
+from google.cloud import secretmanager
 
 # Import functions from link_verify
 from link_verify import fetch_html, extract_text, find_product_info
+
+# =============================================================================
+# CONFIGURATION & SECRETS
+# =============================================================================
+
+_secrets_cache = {}
+
+def get_secret(secret_name: str) -> str:
+    """Retrieve a secret from Google Secret Manager."""
+    if secret_name in _secrets_cache:
+        return _secrets_cache[secret_name]
+    
+    try:
+        project_id = "price-pilot-1765213055260"
+        client = secretmanager.SecretManagerServiceClient()
+        resource_name = f"projects/{project_id}/secrets/{secret_name}/versions/latest"
+        response = client.access_secret_version(request={"name": resource_name})
+        secret_value = response.payload.data.decode("UTF-8")
+        _secrets_cache[secret_name] = secret_value
+        return secret_value
+    except Exception as e:
+        print(f"Error retrieving secret '{secret_name}': {str(e)}")
+        raise
+
+# Fetch credentials from Secret Manager
+try:
+    OPENROUTER_API_KEY = get_secret('OPENROUTER_API_KEY')
+    print("✅ Secrets loaded from Google Secret Manager")
+except Exception as e:
+    print(f"❌ Failed to load secrets: {str(e)}")
+    raise SystemExit(1)
 
 # =============================================================================
 # FASTAPI APP SETUP
@@ -34,9 +66,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# OpenRouter API key for product verification
-OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY', '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')
 
 
 # =============================================================================
