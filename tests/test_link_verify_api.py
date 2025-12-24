@@ -21,21 +21,22 @@ with patch('google.cloud.secretmanager.SecretManagerServiceClient') as mock_clie
     mock_client.return_value = mock_instance
     
     from link_verify_api import app
+    import link_verify
+    import link_verify_api
 
 client = TestClient(app)
 
 
-# Mock external API calls
+# Mock external API calls - patch in link_verify_api where functions are imported
 @pytest.fixture(autouse=True)
 def mock_external_calls():
-    """Mock external HTTP calls to avoid real API calls."""
-    with patch('link_verify.requests.get') as mock_get, \
-         patch('link_verify.requests.post') as mock_post:
+    """Mock link_verify functions to avoid real API calls and return tuples."""
+    with patch.object(link_verify_api, 'fetch_html') as mock_fetch, \
+         patch.object(link_verify_api, 'extract_text') as mock_extract, \
+         patch.object(link_verify_api, 'find_product_info') as mock_find:
         
-        # Mock HTML fetch response
-        mock_html_response = MagicMock()
-        mock_html_response.status_code = 200
-        mock_html_response.text = '''
+        # Mock fetch_html to return tuple (html_content, error_message)
+        mock_fetch.return_value = ('''
         <html>
         <head><title>Test Product Page</title></head>
         <body>
@@ -45,29 +46,24 @@ def mock_external_calls():
             <p>In Stock</p>
         </body>
         </html>
-        '''
-        mock_html_response.raise_for_status = MagicMock()
-        mock_get.return_value = mock_html_response
+        ''', None)
         
-        # Mock OpenRouter LLM response
-        mock_llm_response = MagicMock()
-        mock_llm_response.status_code = 200
-        mock_llm_response.json.return_value = {
-            'choices': [{
-                'message': {
-                    'content': '''title: Dell XPS 13 Laptop
-brand: Dell
-price: £999.99
-description: High-performance laptop
-availability: In Stock
-extras: None'''
-                }
-            }]
-        }
-        mock_llm_response.raise_for_status = MagicMock()
-        mock_post.return_value = mock_llm_response
+        # Mock extract_text to return tuple (text_content, error_message)
+        mock_extract.return_value = (
+            'Dell XPS 13 Laptop £999.99 Dell In Stock',
+            None
+        )
         
-        yield mock_get, mock_post
+        # Mock find_product_info to return tuple (product_info, error_message)
+        mock_find.return_value = ({
+            'title': 'Dell XPS 13 Laptop',
+            'brand': 'Dell',
+            'price': '£999.99',
+            'description': 'High-performance laptop',
+            'availability': 'In Stock'
+        }, None)
+        
+        yield mock_fetch, mock_extract, mock_find
 
 
 class TestHealthCheck:
@@ -199,3 +195,59 @@ class TestErrorHandling:
         """GET on /verify-batch should return 405."""
         response = client.get("/verify-batch")
         assert response.status_code == 405
+
+
+class TestFetchErrors:
+    """Test fetch error scenarios."""
+    
+    def test_fetch_error_returns_error_type(self, mock_external_calls):
+        """When fetch fails, should return errorType."""
+        mock_fetch, mock_extract, mock_find = mock_external_calls
+        # Override the default mock to return an error
+        mock_fetch.return_value = (None, 'HTTP 403 Forbidden - Site blocked request')
+        
+        payload = {
+            "url": "https://example.com/product",
+            "productTitle": "Test Product"
+        }
+        response = client.post("/verify", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["valid"] == False
+        assert data["errorType"] == "fetch_error"
+        assert "403" in data["error"]
+    
+    def test_extract_error_returns_error_type(self, mock_external_calls):
+        """When extract fails, should return errorType."""
+        mock_fetch, mock_extract, mock_find = mock_external_calls
+        # Override mocks - fetch succeeds but extract fails
+        mock_fetch.return_value = ('<html></html>', None)
+        mock_extract.return_value = (None, 'Failed to parse HTML - Empty document')
+        
+        payload = {
+            "url": "https://example.com/product",
+            "productTitle": "Test Product"
+        }
+        response = client.post("/verify", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["valid"] == False
+        assert data["errorType"] == "extract_error"
+    
+    def test_product_not_found_returns_error_type(self, mock_external_calls):
+        """When product not found, should return errorType."""
+        mock_fetch, mock_extract, mock_find = mock_external_calls
+        # Override mocks - fetch and extract succeed but product not found
+        mock_fetch.return_value = ('<html>Content</html>', None)
+        mock_extract.return_value = ('Some text content', None)
+        mock_find.return_value = (None, 'Product not found on page')
+        
+        payload = {
+            "url": "https://example.com/product",
+            "productTitle": "Test Product"
+        }
+        response = client.post("/verify", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["valid"] == False
+        assert data["errorType"] == "product_not_found"
