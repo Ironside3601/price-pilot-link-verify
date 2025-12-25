@@ -132,14 +132,14 @@ def get_secret(secret_name: str) -> str:
         raise
 
 
-def fetch_html(url: str, timeout: int = 15, max_retries: int = 3) -> Tuple[Optional[str], Optional[str]]:
+def fetch_html(url: str, timeout: int = 15, max_retries: int = 1) -> Tuple[Optional[str], Optional[str]]:
     """
-    Fetch HTML content from a URL through proxy with retry logic.
+    Fetch HTML content from a URL through proxy (single attempt, no retries).
     
     Args:
         url: The website URL to fetch
         timeout: Request timeout in seconds
-        max_retries: Number of retry attempts
+        max_retries: Number of retry attempts (default 1 = no retries)
         
     Returns:
         Tuple of (HTML content or None, error message or None)
@@ -187,25 +187,16 @@ def fetch_html(url: str, timeout: int = 15, max_retries: int = 3) -> Tuple[Optio
             if response.status_code == 403:
                 last_error = f"HTTP 403 Forbidden - Site may be blocking requests"
                 logger.warning(f"[Attempt {attempt}] {last_error}")
-                if attempt < max_retries:
-                    time.sleep(2 ** attempt)  # Exponential backoff
-                    continue
                 return None, last_error
             
             if response.status_code == 429:
                 last_error = f"HTTP 429 Too Many Requests - Rate limited"
                 logger.warning(f"[Attempt {attempt}] {last_error}")
-                if attempt < max_retries:
-                    time.sleep(2 ** attempt)
-                    continue
                 return None, last_error
             
             if response.status_code == 503:
                 last_error = f"HTTP 503 Service Unavailable - Site may be down"
                 logger.warning(f"[Attempt {attempt}] {last_error}")
-                if attempt < max_retries:
-                    time.sleep(2 ** attempt)
-                    continue
                 return None, last_error
             
             response.raise_for_status()
@@ -223,16 +214,10 @@ def fetch_html(url: str, timeout: int = 15, max_retries: int = 3) -> Tuple[Optio
         except requests.exceptions.ProxyError as e:
             last_error = f"Proxy connection failed: {str(e)}"
             logger.error(f"[Attempt {attempt}] {last_error}")
-            if attempt < max_retries:
-                time.sleep(2 ** attempt)
-                continue
                 
         except requests.exceptions.SSLError as e:
             last_error = f"SSL/TLS error: {str(e)}"
             logger.error(f"[Attempt {attempt}] {last_error}")
-            if attempt < max_retries:
-                time.sleep(1)
-                continue
                 
         except requests.exceptions.MissingSchema:
             last_error = f"Invalid URL format - missing http:// or https://"
@@ -242,30 +227,18 @@ def fetch_html(url: str, timeout: int = 15, max_retries: int = 3) -> Tuple[Optio
         except requests.exceptions.ConnectionError as e:
             last_error = f"Connection failed: {str(e)}"
             logger.error(f"[Attempt {attempt}] {last_error}")
-            if attempt < max_retries:
-                time.sleep(2 ** attempt)
-                continue
                 
         except requests.exceptions.Timeout:
             last_error = f"Request timed out after {timeout}s"
             logger.error(f"[Attempt {attempt}] {last_error}")
-            if attempt < max_retries:
-                time.sleep(1)
-                continue
                 
         except requests.exceptions.HTTPError as e:
             last_error = f"HTTP error: {str(e)}"
             logger.error(f"[Attempt {attempt}] {last_error}")
-            if attempt < max_retries:
-                time.sleep(2 ** attempt)
-                continue
                 
         except requests.exceptions.RequestException as e:
             last_error = f"Request failed: {str(e)}"
             logger.error(f"[Attempt {attempt}] {last_error}")
-            if attempt < max_retries:
-                time.sleep(2 ** attempt)
-                continue
     
     logger.error(f"All {max_retries} attempts failed for URL: {url}")
     return None, last_error
