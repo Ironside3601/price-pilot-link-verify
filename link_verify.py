@@ -29,9 +29,10 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 
 # Proxy config - password loaded from Google Secret Manager
-PROXY_HOST = 'proxy-jet.io'
+# ProxyJet residential proxy with UK/England region targeting
+PROXY_HOST = 'eu.proxy-jet.io'
 PROXY_PORT = '1010'
-PROXY_USERNAME = '250724Wn6DD'
+PROXY_USERNAME = '250724Wn6DD-resi_region-UK_England'
 
 _proxy_password_cache = None
 
@@ -44,7 +45,7 @@ def get_proxy_password() -> str:
     
     try:
         _proxy_password_cache = get_secret('PROXY_PASSWORD')
-        logger.info("✅ Proxy password loaded from Secret Manager")
+        logger.info("Proxy password loaded from Secret Manager")
         return _proxy_password_cache
     except Exception as e:
         logger.error(f"Failed to load proxy password from Secret Manager: {str(e)}")
@@ -90,8 +91,9 @@ _secrets_cache = {}
 
 def get_secret(secret_name: str) -> str:
     """
-    Retrieve a secret from Google Secret Manager.
+    Retrieve a secret from Google Secret Manager or environment variable.
     Uses caching to avoid repeated API calls.
+    For local testing, set environment variables (e.g., PROXY_PASSWORD, OPENROUTER_API_KEY).
     
     Args:
         secret_name: Name of the secret (e.g., 'OPENROUTER_API_KEY')
@@ -103,6 +105,14 @@ def get_secret(secret_name: str) -> str:
     if secret_name in _secrets_cache:
         return _secrets_cache[secret_name]
     
+    # Try to get from environment variable first (for local testing)
+    env_value = os.environ.get(secret_name)
+    if env_value:
+        logger.info(f"Loaded {secret_name} from environment variable")
+        _secrets_cache[secret_name] = env_value
+        return env_value
+    
+    # Fall back to Secret Manager (for production/Cloud Run)
     try:
         project_id = "price-pilot-1765213055260"
         
@@ -136,6 +146,13 @@ def fetch_html(url: str, timeout: int = 15, max_retries: int = 3) -> Tuple[Optio
     """
     proxies = get_proxies()
     user_agent = get_random_user_agent()
+    
+    # Log proxy configuration (without exposing password)
+    proxy_url = proxies.get('http', '')
+    if '@' in proxy_url:
+        parts = proxy_url.split('@')
+        host_info = parts[1] if len(parts) > 1 else 'unknown'
+        logger.info(f"Proxy configured: ***@{host_info}")
     
     headers = {
         'User-Agent': user_agent,
@@ -422,7 +439,7 @@ PAGE CONTENT (first 15000 characters):
                 product_info[key.strip()] = value.strip()
         
         if product_info:
-            logger.info(f"✅ Product found: {product_info.get('title', 'Unknown')[:50]}")
+            logger.info(f"Product found: {product_info.get('title', 'Unknown')[:50]}")
             return product_info, None
         
         error_msg = "Failed to parse product info from LLM response"

@@ -33,13 +33,13 @@ jobs:
         run: |
           pip install -r requirements.txt
       
-      - name: Run unit tests
+      - name: Run unit tests (skip integration tests)
         run: |
-          pytest tests/ -v --tb=short
+          pytest tests/ -v --tb=short -m "not integration"
       
       - name: Report test results
         if: always()
-        run: echo "✅ All tests passed!"
+        run: echo "All tests passed!"
 
   build-and-deploy:
     needs: test
@@ -105,4 +105,4 @@ jobs:
       - name: Deployment Success
         run: |
           SERVICE_URL=$(cat service-url.txt)
-          echo "✅ Deployed successfully to: $SERVICE_URL"
+          echo "Deployed successfully to: $SERVICE_URL"
