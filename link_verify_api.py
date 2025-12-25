@@ -46,18 +46,18 @@ def get_secret(secret_name: str) -> str:
         response = client.access_secret_version(request={"name": resource_name})
         secret_value = response.payload.data.decode("UTF-8")
         _secrets_cache[secret_name] = secret_value
-        logger.info(f"✅ Secret '{secret_name}' loaded successfully")
+        logger.info(f"Secret '{secret_name}' loaded successfully")
         return secret_value
     except Exception as e:
-        logger.error(f"❌ Error retrieving secret '{secret_name}': {str(e)}")
+        logger.error(f"Error retrieving secret '{secret_name}': {str(e)}")
         raise
 
 # Fetch credentials from Secret Manager
 try:
     OPENROUTER_API_KEY = get_secret('OPENROUTER_API_KEY')
-    logger.info("✅ All secrets loaded from Google Secret Manager")
+    logger.info("All secrets loaded from Google Secret Manager")
 except Exception as e:
-    logger.error(f"❌ Failed to load secrets: {str(e)}")
+    logger.error(f"Failed to load secrets: {str(e)}")
     raise SystemExit(1)
 
 # =============================================================================
@@ -140,14 +140,14 @@ async def verify_single_link(url: str, product_title: str) -> Dict[str, Any]:
         Dict with verification result
     """
     try:
-        logger.info(f"🔍 Starting verification for: {url}")
-        logger.info(f"📦 Looking for product: {product_title[:50]}...")
+        logger.info(f"Starting verification for: {url}")
+        logger.info(f"Looking for product: {product_title[:50]}...")
         
         # Fetch HTML (returns tuple: html_content, error_message)
         html_content, fetch_error = fetch_html(url)
         if not html_content:
             error_msg = fetch_error or 'Failed to fetch URL'
-            logger.warning(f"❌ Fetch failed for {url}: {error_msg}")
+            logger.warning(f"Fetch failed for {url}: {error_msg}")
             return {
                 'valid': False,
                 'error': error_msg,
@@ -156,13 +156,13 @@ async def verify_single_link(url: str, product_title: str) -> Dict[str, Any]:
                 'productTitle': product_title
             }
         
-        logger.info(f"✅ Successfully fetched HTML ({len(html_content)} bytes)")
+        logger.info(f"Successfully fetched HTML ({len(html_content)} bytes)")
         
         # Extract text content (returns tuple: text_content, error_message)
         text_content, extract_error = extract_text(html_content)
         if not text_content:
             error_msg = extract_error or 'Failed to extract content from page'
-            logger.warning(f"❌ Extract failed for {url}: {error_msg}")
+            logger.warning(f"Extract failed for {url}: {error_msg}")
             return {
                 'valid': False,
                 'error': error_msg,
@@ -171,14 +171,14 @@ async def verify_single_link(url: str, product_title: str) -> Dict[str, Any]:
                 'productTitle': product_title
             }
         
-        logger.info(f"✅ Extracted text content ({len(text_content)} chars)")
+        logger.info(f"Extracted text content ({len(text_content)} chars)")
         
         # Search for the product using LLM (returns tuple: product_info, error_message)
         product_info, llm_error = find_product_info(text_content, product_title, OPENROUTER_API_KEY)
         
         if not product_info:
             error_msg = llm_error or 'Product not found on this page'
-            logger.warning(f"❌ Product search failed for {url}: {error_msg}")
+            logger.warning(f"Product search failed for {url}: {error_msg}")
             return {
                 'valid': False,
                 'productTitle': product_title,
@@ -200,11 +200,11 @@ async def verify_single_link(url: str, product_title: str) -> Dict[str, Any]:
             'verifiedAt': datetime.utcnow().isoformat() + 'Z'
         }
         
-        logger.info(f"✅ Product verified: {response['productTitle'][:40]} - {response['price']}")
+        logger.info(f"Product verified: {response['productTitle'][:40]} - {response['price']}")
         return response
         
     except Exception as e:
-        logger.exception(f"💥 Unexpected error verifying {url}: {str(e)}")
+        logger.exception(f"Unexpected error verifying {url}: {str(e)}")
         return {
             'valid': False,
             'error': f'Internal error: {str(e)}',
@@ -260,7 +260,7 @@ async def verify_batch(request: BatchVerifyRequest):
         logger.info(f"🔄 Processing link {idx + 1}/{len(request.links)}")
         
         if not link.url or not link.productTitle:
-            logger.warning(f"⚠️ Link {idx + 1} missing url or productTitle")
+            logger.warning(f"Link {idx + 1} missing url or productTitle")
             results.append({
                 'valid': False,
                 'error': 'Missing url or productTitle',
