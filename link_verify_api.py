@@ -8,6 +8,7 @@ Port: 8080
 """
 
 import logging
+import asyncio
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -348,34 +349,33 @@ async def verify_link(request: VerifyRequest):
 @app.post("/verify-batch", response_model=BatchVerifyResponse)
 async def verify_batch(request: BatchVerifyRequest):
     """
-    Verify multiple links in one request.
+    Verify multiple links concurrently (up to 10 at a time).
     
     - **links**: Array of objects with url and productTitle
     """
     if not request.links:
         raise HTTPException(status_code=400, detail="No links provided")
     
-    logger.info(f"Starting batch verification for {len(request.links)} links")
-    results = []
+    logger.info(f"Starting batch verification for {len(request.links)} links (concurrent processing)")
     
-    for idx, link in enumerate(request.links):
-        logger.info(f"Processing link {idx + 1}/{len(request.links)}")
-        
-        if not link.url or not link.productTitle:
-            logger.warning(f"Link {idx + 1} missing url or productTitle")
-            results.append({
-                'valid': False,
-                'error': 'Missing url or productTitle',
-                'errorType': 'validation_error',
-                'url': link.url
-            })
-            continue
-        
-        result = await verify_single_link(link.url, link.productTitle, link.amazonPrice)
-        results.append(result)
+    # Limit to 10 concurrent requests
+    semaphore = asyncio.Semaphore(10)
+    
+    async def process_link(link: BatchLinkItem):
+        async with semaphore:
+            if not link.url or not link.productTitle:
+                return {
+                    'valid': False,
+                    'error': 'Missing url or productTitle',
+                    'errorType': 'validation_error',
+                    'url': link.url
+                }
+            return await verify_single_link(link.url, link.productTitle, link.amazonPrice)
+    
+    # Run all links concurrently
+    results = await asyncio.gather(*[process_link(link) for link in request.links])
     
     valid_count = sum(1 for r in results if r.get('valid', False))
-    
     logger.info(f"Batch complete: {valid_count}/{len(results)} links valid")
     
     return {

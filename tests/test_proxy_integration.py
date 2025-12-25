@@ -92,7 +92,7 @@ class TestProxyIntegration:
         url = "http://example.com"
         
         print(f"\nFetching: {url}")
-        html_content, error = fetch_html(url, timeout=15, max_retries=2)
+        html_content, error = fetch_html(url, timeout=15)
         
         if error:
             print(f"Error occurred: {error}")
@@ -116,7 +116,7 @@ class TestProxyIntegration:
         url = "https://www.johnlewis.com/john-lewis-partners-egyptian-cotton-400-thread-count-standard-pillowcase-white/p3182352"
         
         print(f"\nFetching: {url}")
-        html_content, error = fetch_html(url, timeout=30, max_retries=3)
+        html_content, error = fetch_html(url, timeout=30)
         
         if error:
             print(f"Error occurred: {error}")
@@ -146,7 +146,7 @@ class TestProxyIntegration:
         url = "https://www.selfridges.com/IT/en/product/this-old-thing-london-pre-loved-chanel-cc-small-double-flap-leather-shoulder-bag_R04574246/#colour=BLACK"
         
         print(f"\nFetching: {url}")
-        html_content, error = fetch_html(url, timeout=30, max_retries=3)
+        html_content, error = fetch_html(url, timeout=30)
         
         if error:
             print(f"Error occurred: {error}")
@@ -176,7 +176,7 @@ class TestProxyIntegration:
         url = "https://www.harrods.com/en-gb/p/gucci-the-alchemists-garden-the-voice-of-the-snake-eau-de-parfum-100ml-000000000006287836"
         
         print(f"\nFetching: {url}")
-        html_content, error = fetch_html(url, timeout=30, max_retries=3)
+        html_content, error = fetch_html(url, timeout=30)
         
         if error:
             print(f"Error occurred: {error}")
@@ -207,7 +207,7 @@ class TestProxyIntegration:
         
         print(f"\nFetching product page: {url}")
         
-        html_content, error = fetch_html(url, timeout=30, max_retries=3)
+        html_content, error = fetch_html(url, timeout=30)
         
         if error:
             print(f"Error occurred: {error}")
@@ -241,7 +241,7 @@ class TestProxyErrorHandling:
         
         url = "https://this-website-definitely-does-not-exist-12345678.com"
         
-        html_content, error = fetch_html(url, timeout=15, max_retries=2)
+        html_content, error = fetch_html(url, timeout=15)
         
         assert html_content is None, "Should return None for invalid domain"
         assert error is not None, "Should return an error message"
